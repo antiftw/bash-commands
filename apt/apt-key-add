@@ -1,0 +1,345 @@
+#!/bin/bash
+# This script is used to replace the apt add-key command, since it is deprecated.
+# It will also allow you to add the corresponding repository to sources.list
+#
+# Version : 1.0.0
+# Author  : Antolin Janssen
+# Release : 2023-07-08
+# License : MIT
+#
+# Inspired by https://github.com/ameinild/add-apt-key
+# Rewritten to be able to be used non-interactively
+#
+# Usage: 
+# apt-key-key -i=<input_file> [-o=<output_file>] [-p=<path>] [-sc=<component>] [-ss=<suite>] [-su=<uri>]
+#                             [-s=<sigature>] [-r=<keyring>] [-v]
+# 
+# For more information, use: apt-key-add --help
+#
+
+# Local function definition
+exit_error() {
+  printf "\nAborting: \n\n%s\n\n" "$1" >&2
+  exit 1
+}
+
+for arg in "$@"; do
+    case "$arg" in
+        -h|--help)
+            echo ""
+            echo "This script is used to replace apt add-key command, since it is deprecated"
+            echo "It will also allow you to add the corresponding repository to sources.list"
+            echo "by calling apt-src-add. "
+            echo "Usage: apt-add-key -i=<input_file> [-o=<output_file>] [-p=<path>] [-sc=<comp>] [-ss=<suite>] [-su=<uri>] [-s=<sig>] [-r=<keyring>] [-v]"
+            echo "Regular/basic usage:"
+            echo "apt-key-add -i=https://pkg.jenkins.io/debian/jenkins.io.key -su=http://pkg.jenkins.io/debian-stable -ss=binary/"
+            echo "apt-key-add -i=https://updates.signal.org/desktop/apt/keys.asc -o=signal-desktop -su='https://updates.signal.org/desktop/apt' -ss='xenial' -sc='main'"
+            echo ""
+            echo "  -i, --input=<input_file>    Inputfile for key to add, can be:"
+            echo "                               - URL - downloaded in current path"
+            echo "                               - Filename - read from current path ($PWD)"
+            echo "                               - Path + filename - read from given path"
+            echo ""
+            echo "  -o, --output=<output_file>  Key output filename, can be:"
+            echo "                               - Empty (default) - filename will be generated from name keyfile"                             
+            echo "                               - Filename - advised when keyfile in url has generic name"                        
+            echo ""
+            echo "  -p, --path=<path>           Path for sources.list, default: /etc/apt/sources.list.d/"
+            echo "  -r, --keyring=<keyring>     Path of keyring to use"
+            echo "                               - default: /usr/share/keyrings"
+            echo "                               - for package maintainers use: /etc/apt/keyrings"
+            echo ""
+            echo " The following options are used to add the corresponding repository to sources.list"
+            echo " They will be passed on to apt-src-add, see apt-src-add --help for more information"
+            echo " If -sc, -ss and -su are not set, no repository will not be added, and you will have to do it manually"
+            echo "  -s,  --source-signature=<string>   Signature of the repository to add, can be:"
+            echo "                                      - blank (default) - signature will be passed on from script"
+            echo "                                      - full path       - specified signature will be used to sign repository"
+            echo ""
+            echo "  -sc, --source-components=<string>  Components of the repository to add"
+            echo "  -ss, --source-suites=<string>      Suites of the repository to add"
+            echo "  -su, --source-uri=<string>         URI of the repository to add"
+            echo ""
+            echo "  -v(v), --v(v)erbose         Verbose output, allowed values: 0, 1, 2:"
+            echo "                               - 0 - no verbose output (default)"
+            echo "                               - 1 - verbose output (-v) (show main steps)"
+            echo "                               - 2 - extra verbose output (-vv) (dump variables)"
+            echo "  -k, --keep                  Keep temporary files (default: false)"
+            echo ""
+            exit 0
+            ;;
+        -i=*|--input=*)
+            KEY="${arg#*=}"
+            ;;
+        -o=*|--output=*)
+            OUTPUT_FILE="${arg#*=}"
+            ;;
+        -sc=*|--source-components=*)
+            SOURCE_COMPONENTS="${arg#*=}"
+            ;;
+        -ss=*|--source-suites=*)
+            SOURCE_SUITES="${arg#*=}"
+            ;;
+        -su=*|--source-uri=*)
+            SOURCE_URI="${arg#*=}"
+            ;;
+        -s=*|--source-signatory=*)
+            SOURCE_SIGNATURE="${arg#*=}"
+            ;;
+        -p=*|--path=*)
+            SOURCE_PATH="${arg#*=}"
+            ;;
+        -r=*|--keyring=*)
+            KEYRING="${arg#*=}"
+            ;;
+        -vv|--vverbose)
+            VERBOSE=2
+            ;;
+        -v|--verbose)
+            VERBOSE=1
+            ;;
+        -k|--keep)
+            KEEP=true
+            ;;
+        *)
+            exit_error "Unknown argument: $arg, use --help for more information"
+            ;;
+    esac
+done
+
+# Verbose not set -> no verbose output
+VERBOSE=${VERBOSE:-0}
+
+# Check if script is run as root
+if [ "$(id -u)" != "0" ]; then
+    exit_error "must run as root"
+fi
+
+[ "$VERBOSE" -ge 1 ] && printf "\nChecking input parameters\n"
+[ "$VERBOSE" -ge 1 ] && printf "Checking key [ $KEY ] " 
+case "$KEY" in
+    # $KEY is an URL, download file
+    http://*|https://*)
+        [ "$VERBOSE" -ge 1 ] && printf "==> key is an URL ✔️\n" 
+        TMPPATH="$PWD"
+        TMPFILE="${KEY##*/}"
+        if [ "$(command -v wget)" ]; then
+            DL_CMD="WGET"
+            CMD_REFERENCE="https://www.gnu.org/software/wget/manual/html_node/Exit-Status.html"
+        elif [ "$(command -v curl)" ]; then
+            DL_CMD="CURL"
+            CMD_REFERENCE="https://everything.curl.dev/usingcurl/returns"
+        else
+            exit_error "wget or curl mst be installed to download key"
+        fi
+        ;;
+    # otherwise, check if it is a file and/or path
+    *)
+        case "$KEY" in
+           # $KEY is only a path (ending with /)
+           /*/)
+                exit_error "need a keyfile, use --help for more information"
+                ;;
+            # $KEY is a path and a filename
+            /*)
+                [ "$VERBOSE" -ge 1 ] && printf "==> key is a path + filename ✔️\n" 
+                # Extract path and filename
+                TMPPATH="${KEY%/*}"
+                TMPFILE="${KEY##*/}"
+            ;;
+            # $KEY is only filename    
+            *)
+                [ "$VERBOSE" -ge 1 ] && printf "==> key is a file ✔️\n" 
+                # Use current path, filename as provided
+                TMPPATH="$PWD"
+                TMPFILE="$KEY"
+            ;;
+        esac
+esac
+[ "$VERBOSE" -ge 1 ] && printf "Checking output file [ $OUTPUT_FILE ] " 
+case "$OUTPUT_FILE" in
+    # $OUTPUT_FILE is only a path (ending with /) || $OUTPUT_FILE is a path and a filename
+    /*/ | /*)
+         exit_error "OUTPUT_FILE must be filename or empty, use --help for more information"
+        ;;
+    # $OUTPUT_FILE is only filename (or empty)
+    *)
+        if [ "${#OUTPUT_FILE}" != 0 ]; then
+            [ "$VERBOSE" -ge 1 ] && printf "==> output file is a filename ✔️\n"
+            # $OUTPUT_FILE is only filename
+            KEYFILE="$OUTPUT_FILE"
+        else
+            
+            # $OUTPUT_FILE is empty, generate filename from InputFile key
+            KEYFILE="${TMPFILE%%.*}"
+            [ "$VERBOSE" -ge 1 ] && printf "==> output file is empty ✔️\n"
+        fi
+        ;;
+esac
+
+# Default values
+[ "$VERBOSE" -ge 1 ] && printf "\nSetting default values if not set "
+# Keep not set -> remove temporary files
+KEEP=${KEEP:-false}
+
+# Check if we need to download the key
+DL_CMD=${DL_CMD:-""}
+
+# InputPath not set -> use current path
+TMPPATH=${TMPPATH:-"$PWD"}
+# InputFile not set -> force exit @ TMPFILE Check
+TMPFILE=${TMPFILE:-""}
+
+# Source path not set -> use default
+SOURCE_PATH=${SOURCE_PATH:-"/etc/apt/sources.list.d"}
+# Source file generated from keyfile name
+SOURCE_FILE="$KEYFILE.list"
+SOURCE_COMPONENTS=${SOURCE_COMPONENTS:-}
+SOURCE_SUITES=${SOURCE_SUITES:-}
+SOURCE_URI=${SOURCE_URI:-}
+SOURCE_SIGNATURE=${SOURCE_SIGNATURE:-}
+
+# Keyring path not set -> use default
+KEYPATH=${KEYRING:-"/usr/share/keyrings"}
+# Append -archive-keyring.gpg following recommended naming convention
+KEYFILE="$KEYFILE-archive-keyring.gpg"
+[ "$VERBOSE" -ge 1 ] && printf "✔️"
+if [ "$VERBOSE" -ge 2 ]; then 
+    printf "Variables:\n"
+    printf "Input keyfile     : %s\n" "$KEY"
+    printf "Intermediate file : %s/%s \n" "$TMPPATH" "$TMPFILE"
+    printf "Outputfile        : %s/%s \n" "$KEYPATH" "$KEYFILE"
+    printf "Sourcesfile       : %s/%s \n" "$SOURCE_PATH" "$SOURCE_FILE"
+    printf "Sources-Signature : %s \n" "$SOURCE_SIGNATURE"
+    printf "Sources-URI       : %s \n" "$SOURCE_URI"
+    printf "Sources-Suites    : %s \n" "$SOURCE_SUITES"
+    printf "Sources-Components: %s \n" "$SOURCE_COMPONENTS"
+    printf "Keep              : %s \n" "$KEEP"
+    printf "\n"
+fi
+
+# If we are going to add a source: check if apt-src-add is installed
+if [ ! -z "$SOURCE_URI" ] || [ ! -z "$SOURCE_SUITES" ] || [ ! -z "$SOURCE_COMPONENTS" ] ; then
+    if [ ! "$(command -v apt-src-add)" ]; then
+        exit_error "apt-src-add command is not recognized"
+    fi
+fi
+
+# Initialize return code
+RETURN_CODE=-1
+
+# Check if wget is installed, if not, check if curl is installed
+[ "$VERBOSE" -ge 1 ] && printf "Attempting to download key from : [ $KEY ] \n"
+if [ "$DL_CMD" == 'WGET' ]; then
+    # Use wget to download key
+    wget -qO "$TMPPATH/$TMPFILE" "$KEY"; RETURN_CODE=$?
+elif [ "$DL_CMD" == 'CURL' ]; then
+    # Use curl to download key
+    curl -so "$TMPPATH/$TMPFILE" "$KEY"; RETURN_CODE=$?
+else
+    exit_error "wget or curl mst be installed to download key"
+fi
+
+# Handle return code
+if [ "$RETURN_CODE" -ne 0 ]; then
+    # Download failed, report error and exit
+    exit_error "[ $DL_CMD ] failed with code [ $RETURN_CODE ] to download key from [ $KEY ].\n See [ $CMD_REFERENCE ] for more information."
+else
+    # Download succeeded, report success
+    [ "$VERBOSE" -ge 1 ] && printf "Key downloaded using $DL_CMD to    : [ $TMPPATH/$TMPFILE ] ✔️\n"
+fi
+
+
+
+# Check if we can locate the input file
+# @TMPFILE Check 
+if [ "$TMPFILE" == "" ] || [ ! -f "$TMPPATH/$TMPFILE" ]; then
+  exit_error "Input Key file not found: $TMPPATH/$TMPFILE"
+fi
+
+[ "$VERBOSE" -ge 1 ] && printf "\nImporting key: "
+
+# Process the key. depending on the format
+case $(file "$TMPPATH/$TMPFILE") in
+    # ASCII armored (old) - dearmor and import
+    *'PGP public key block Public-Key (old)')
+        [ "$VERBOSE" -ge 1 ] && printf "Type 'ASCII Armored' detected: De-armoring Key...\n"
+        gpg --batch --yes --dearmor --keyring=gnupg-ring "$TMPPATH/$TMPFILE"
+        ;;
+    # Secret key - import and export
+    *'PGP public key block Secret-Key')
+        [ "$VERBOSE" -ge 1 ] && printf "Type 'Secret Public' detected: Importing key...\n"
+        gpg --batch --yes --no-default-keyring --keyring=gnupg-ring:"$TMPPATH/temp-keyring.gpg" --quiet --import "$TMPPATH/$TMPFILE"
+        gpg --batch --yes --no-default-keyring --keyring=gnupg-ring:"$TMPPATH/temp-keyring.gpg" --export --output "$TMPPATH/$TMPFILE.gpg"
+        rm "$TMPPATH/temp-keyring.gpg"
+        [ -f "$TMPPATH/temp-keyring.gpg~" ] && rm "$TMPPATH/temp-keyring.gpg~"
+        ;;
+    # Public ring (v4) - nothing to do, just copy
+    *'OpenPGP Public Key Version 4'*)
+        [ "$VERBOSE" -ge 1 ] && printf "Type 'Public Version 4' detected: Copying key...\n"
+        cp "$TMPPATH/$TMPFILE" "$TMPPATH/$TMPFILE.gpg"
+        ;;
+    *)
+        exit_error "Unknown key type"
+        ;;
+esac
+
+# Check if processing was successful
+KEY_TYPE=$(file "$TMPPATH/$TMPFILE.gpg" | grep -c 'OpenPGP Public Key Version 4')
+if [ "$KEY_TYPE" -eq 0 ]; then
+    exit_error "Something went wrong while processing the key."
+else
+    [ "$VERBOSE" -ge 1 ] && printf "Key processed successfully ✔️\n"
+fi
+
+
+# Move key to the desired location
+[ "$VERBOSE" -ge 1 ] && printf "\nMoving key [ %s ] to [ %s ]\n" "$TMPPATH/$TMPFILE.gpg" "$KEYPATH/$KEYFILE"
+mv "$TMPPATH/$TMPFILE.gpg" "$KEYPATH/$KEYFILE"; RETURN_CODE=$?
+if [ "$RETURN_CODE" -ne 0 ]; then
+    exit_error "Failed to move key to [ $KEYPATH/$KEYFILE ]"
+else
+    [ "$VERBOSE" -ge 1 ] && printf "Key moved successfully ✔️\n"
+fi
+
+# If source information is set, add it to the sources.list.d
+if [ ! -z "$SOURCE_URI" ] && [ ! -z "$SOURCE_SUITES" ] && [ ! -z "$SOURCE_COMPONENTS" ]; then
+    [ "$VERBOSE" -ge 1 ] && printf "\nAdding repository to sources"
+    # Pass on verbose level
+    VERBOSE_STRING=""
+    [ "$VERBOSE" -eq 1 ] && VERBOSE_STRING="-v"
+    [ "$VERBOSE" -eq 2 ] && VERBOSE_STRING="-vv"
+    
+    # Check if we need to add a specified signature, or use the keyring
+    KEYRING_STRING="$KEYPATH/$KEYFILE"
+    [ "$SOURCE_SIGNATURE" != "" ] && KEYRING_STRING="$SOURCE_SIGNATURE"
+
+    # Create source file
+    apt-src-add -n=$NAME -u=$SOURCE_URI -s=$SOURCE_SUITES -c=$SOURCE_COMPONENTS -os=$KEYRING_STRING $VERBOSE_STRING ; RETURN_CODE=$?
+    if [ "$RETURN_CODE" -ne 0 ]; then
+        exit_error "Failed to add source to sources.list.d"
+    else
+        [ "$VERBOSE" -ge 1 ] && printf "✔️\n"
+    fi
+fi
+
+# Cleanup
+if [ "$KEEP" == false ]; then
+    [ "$VERBOSE" -ge 1 ] && printf "\nRemoving temporary files:\n"
+    # Remove temporary files
+    TMP_FILES=( "$TMPPATH/$TMPFILE" "$TMPPATH/$TMPFILE.gpg" "$TMPPATH/$TMPFILE.gpg~")
+    for TMP in $TMP_FILES
+    do
+        [ -f "$TMP" ] && rm "$TMP"; RETURN_CODE=$?
+        if [ "$RETURN_CODE" -ne 0 ]; then
+            exit_error "Failed to remove temporary file [ $TMP ]"
+        else
+            [ "$VERBOSE" -ge 1 ] && printf "Removed [ $TMP ] ✔️\n"
+        fi
+    done
+fi
+
+[ "$VERBOSE" -ge 1 ] && printf "\nDone\n"
+
+# Exit with success
+exit 0

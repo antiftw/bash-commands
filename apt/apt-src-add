@@ -1,0 +1,544 @@
+#!/bin/bash
+#
+# This script is used to add a new source repository to the sources.list.d directory.
+#
+# Note: This script will not add the key to the apt-keyring, this must be either done manually,
+# or by using the apt-key-add script.
+#
+# Note: Running apt-key-add can also automatically run this script, so there should be no need 
+# to run this script manually.
+#
+# Version : 1.0.0
+# Author  : Antolin Janssen
+# Release : 2023-07-08
+# License : MIT
+#
+# Usage: apt-src-add -n=<name> -u=<URIS> -c=<components> -s=<suite> -os=<signature> 
+#                    [-e=<enabled>] [-f=<format>] [-l=<path>] [-t=<types>]  
+#                    [-opt1,...,-optN] [-v(v)]
+# 
+# For more information, run: apt-src-add --help
+#
+exit_error() {
+  printf "\nAborting: \n\n%s\n\n" "$1" >&2
+  exit 1
+}
+
+for ARG in "$@"; do
+    case "$ARG" in
+        -h|--help)
+            echo ""
+            echo " This script is used to add a source package to the sources.list."
+            echo ""
+            echo " Note: This command will not add the key to the apt-keyring, this must be either done manually,"
+            echo "       or by using the apt-key-add script."
+            echo ""
+            echo " Also: Running apt-key-add can also automatically run this command, so there should be no need"
+            echo "       to run this script manually."
+            echo ""
+            echo " Usage:                          apt-src-add -n=<name> -u=<URIS> -c=<components> -s=<suite> -os=<signature>"
+            echo "                                             [-e=<enabled>] [-f=<format>] [-l=<path>] [-t=<types>]  [-opt1,...,-optN] [-v(v)]"
+            echo ""
+            echo " E.g."
+            echo ""
+            echo " apt-src-add -n=signal-desktop -u=https://updates.signal.org/desktop/apt -s=xenial -c=main -os=/usr/share/keyrings/signal-desktop-archive-keyring.gpg"
+            echo ""
+            echo "  -c, --components=<csv>         Specify different sections of one distribution within a Suite (e.g. main, contrib, non-free)"
+            echo "                                  - If Suites is an exact path, this option must be omitted"
+            echo "                                  - If Suites is a distribution name, at least one component must be specified"
+            echo ""
+            echo "  -e, --enabled=<bool>           Specify whether this source should be enabled, allowed values:"
+            echo "                                  - true  - enable this source (default)"
+            echo "                                  - false - disable this source"
+            echo ""
+            echo "  -f, --force                    Force overwrite of existing source file"
+            echo "  -l, --location=<path>          Specify the location of the sourcedirectory, default is /etc/apt/sources.list.d/"
+            echo "  -n, --name=<string>            Name of the source package, e.g. 'signal-desktop'"
+            echo "                                  - Can be anything, but should be unique"
+            echo ""
+            echo "  -s, --suites=<csv>             Can specify one of the following:"
+            echo "                                  - Exact path in relation to URIS, must end with a slash (/), in which case components must be omitted" 
+            echo "                                  - Distribution name (e.g. a version codename like disco, artful, etc.)"
+            echo ""
+            echo "  -sf, --source-format=<string>  Specify the format of the sourcefile, allowed values:"
+            echo "                                  - DEB822 - New (long) format (default)"
+            echo "                                  - OLS    - One-Line-Style (short, old) format"
+            echo "                                  For more information see https://repolib.readthedocs.io/en/latest/deb822-format.html"
+            echo ""
+            echo "  -t, --types=<csv>              Types of packages to add, allowed values:"
+            echo "                                  - deb     - binary packages (default)"
+            echo "                                  - deb-src - source packages"
+            echo ""
+            echo "  -u, --URIS=<csv>               URIS of the package to add, usually we will use 'http(s)://'; allowed formats:"
+            echo "                                  - cdrom://<path_to_cdrom> - local cdrom"
+            echo "                                  - copy, identicat to file scheme"
+            echo "                                  - file://<path_to_file> - local file"
+            echo "                                  - ftp://<url_to_file> - remote file"
+            echo "                                  - http(s)://<url_to_file> - remote file"
+            echo "                                  - rsh, ssh - remote file"
+            echo "                                  - other - APT can be extended with even more methods"
+            echo "                                  - For more information see: https://manpages.debian.org/stretch/apt/sources.list.5.en.html#URI_SPECIFICATION"
+            echo ""
+            echo "  -v(v), --v(v)erbose            Verbose output, allowed values: 0, 1, 2:"
+            echo "                                  - 0 - no verbose output (default)"
+            echo "                                  - 1 - verbose output (-v) (show main steps)"
+            echo "                                  - 2 - extra verbose output (-vv) (dump variables)"
+            echo ""
+            echo " Regarding the following options, most of them should be kept on their default values, unless you know what you are doing."
+            echo " One clear exception is the '-os' option, which is required when exectuting this command, and is used to specify the keyring to use for this source."
+            echo " More detailed information about these options can be found here:"
+            echo " https://manpages.debian.org/stretch/apt/sources.list.5.en.html#THE_DEB_AND_DEB-SRC_TYPES:_OPTIONS"
+            echo ""
+            echo "  -o(<opt>), --option<-opt>=<o>  Configuration options - not an actual option itself - allowed variants:"
+            echo ""
+            echo "  -oa, --opt-arch=<csv>          Specifies which architecture info should be downloaded"
+            echo "                                  - If not set (default), will use all as defined by APT:Architectures"
+            echo ""
+            echo "  -oai, --opt-allow-insec=<bool> These three circumvent parts of apt-secure(9), NOT RECOMMENDED!"
+            echo "  -oadti, --opt-allow-down-to-insec=<bool>"
+            echo "  -oaw, --opt-allow-weak=<bool>   - All default to false, and should only be used if you know what you are doing!"
+            echo ""
+            echo "  -oc, --opt-check-valid=<bool>  Specifies whether APT should try to detect replay attacks, allowed values:"
+            echo "                                  - true  - check for replay attacks (default)"
+            echo "                                  - false - do not check for replay attacks"
+            echo ""
+            echo "  -oe, --opt-enabled=<bool>      Specifies whether this source should be enabled, allowed values:"
+            echo "                                  - true  - enable this source (default)"
+            echo "                                  - false - disable this source"
+            echo ""
+            echo "  -oh, --opt-by-hash=<string>    Specifies whether hashes should be used for this source, allowed values:"
+            echo "                                  - true  - use hashes (default) if the source indicates it supports it"
+            echo "                                  - false - do not use hashes if the source indicates it supports it"
+            echo "                                  - force - use regardless of whether the source indicates it supports it"
+            echo ""
+            echo "  -ol, --opt-lang=<csv>          Specifies which language info should be downloaded"
+            echo "                                  - If not set (default), will use all as defined by Acquire::Languages"
+            echo ""
+            echo "  -op, --opt-pdiff=<bool>        Specifies whether PDiffs should be used for this source, allowed values:"
+            echo "                                  - true  - use PDiffs (default) - when not specified, this is the default"
+            echo "                                  - false - do not use PDiffs"
+            echo ""
+            echo "  -ot, --opt-target=<csv>       Specifies which targets apts will be downloaded from this source"
+            echo "                                  - If not set (default), will use all as defined by Acquire::IndexTargets"
+            echo ""
+            echo "  -os, --opt-sig=<string>        Specifies the signature for this source, can be:"
+            echo "                                  - Absolute path to keyring file (e.g. /usr/share/keyrings/signal-desktop-archive-keyring.gpg)"
+            echo "                                  - One or more fingerprints of keys in either trusted.gpg or trusted.gpg.d (e.g. 1234ABCD,1234ABCE)"
+            echo ""
+            echo "  -otr, --opt-trusted=<bool>     Specifies whether this source is trusted, allowed values:"
+            echo "                                  - default - this source is trusted if it passes auth tests (default, cannot be passed explicitly)"
+            echo "                                  - true    - force trusted, even when not passing auth tests. NOT RECOMMENDED!"
+            echo "                                  - false   - force untrusted, even when passing auth tests."
+            echo ""
+            echo "  -ovmin, --opt-valid-until-min=<int>"
+            echo "  -ovmax, --opt-valid-until-max=<int>     Specify the minimum and maximum time in seconds that data from this repo is valid for"
+            echo ""
+            
+            exit 0
+            ;;
+        -c=*|--components=*)
+            COMPONENTS="${ARG#*=}"
+            ;;
+        -e=*|--enabled=*)
+            ENABLED="${ARG#*=}"
+            ;;
+        -f|--force)
+            FORCE=true
+            ;;
+        -l=*|--location=*)
+            LOCATION="${ARG#*=}"
+            ;;
+        -n=*|--name=*)
+            NAME="${ARG#*=}"
+            ;;
+        -s=*|--suites=*)
+            SUITES="${ARG#*=}"
+            ;;
+        -sf=*|--source-format=*)
+            FORMAT="${ARG#*=}"
+            ;;
+        -t=*|--types=*)
+            TYPES="${ARG#*=}"
+            ;;
+        -u=*|--URIS=*)
+            URIS="${ARG#*=}"
+            ;;
+        -v|--verbose)
+            VERBOSE=1
+            ;;
+        -vv)
+            VERBOSE=2
+            ;;
+        -oa=*|--opt-arch=*)
+            ARCHITECTURE="${ARG#*=}"
+            ;;
+        -oai=*|--opt-allow-insec=*)
+            ALLOW_INSECURE="${ARG#*=}"
+            ;;
+        -oadti=*|--opt-allow-down-to-insec=*)
+            ALLOW_DOWNGRADE_TO_INSECURE="${ARG#*=}"
+            ;;
+        -oaw=*|--opt-allow-weak=*)
+            ALLOW_WEAK="${ARG#*=}"
+            ;;
+        -oc=*|--opt-check-valid=*)
+            CHECK_VALID="${ARG#*=}"
+            ;;
+        -oe=*|--opt-enabled=*)
+            ENABLED="${ARG#*=}"
+            ;;
+        -oh=*|--opt-by-hash=*)
+            BY_HASH="${ARG#*=}"
+            ;;
+        -ol=*|--opt-lang=*)
+            LANGUAGE="${ARG#*=}"
+            ;;
+        -op=*|--opt-pdiff=*)
+            PDIFF="${ARG#*=}"
+            ;;
+        -os=*|--opt-signed=*)
+            SIGNATURE="${ARG#*=}"
+            ;;
+        -ot=*|--opt-target=*)
+            TARGET="${ARG#*=}"
+            ;;
+        -otr=*|--opt-trusted=*)
+            TRUSTED="${ARG#*=}"
+            ;;
+        -ovmin=*|--opt-valid-until-min=*)
+            VALID_UNTIL_MIN="${ARG#*=}"
+            ;;
+        -ovmax=*|--opt-valid-until-max=*)
+            VALID_UNTIL_MAX="${ARG#*=}"
+            ;;
+        *)
+            exit_error "Unknown argument: $ARG, use --help for more information"
+            ;;
+    esac
+done
+
+# Check if script is run as root
+if [ "$(id -u)" != "0" ]; then
+    exit_error "must run as root"
+fi
+
+# Default values
+# Verbose level
+VERBOSE=${VERBOSE:-0}
+# Force overwrite
+FORCE=${FORCE:-false}
+
+FORMAT=${FORMAT:-"DEB822"}
+LOCATION=${LOCATION:-"/etc/apt/sources.list.d"}
+
+# Source info, required
+COMPONENTS=${COMPONENTS:-}
+SUITES=${SUITES:-}
+TYPES=${TYPES:-deb}
+URIS=${URIS:-}
+
+# Options
+# Enabled is a new option for the DEB822 format, and is required. If not set, default to true
+# For the OLS format, we can still use it to enable/disable the source (by commenting the line out)
+ENABLED=${ENABLED:-true}
+# Optional options
+ARCHITECTURE=${ARCHITECTURE:-""}
+LANGUAGE=${LANGUAGE:-""}
+TARGET=${TARGET:-""}
+PDIFF=${PDIFF:-""}
+BY_HASH=${BY_HASH:-""}
+ALLOW_INSECURE=${ALLOW_INSECURE:-""}
+ALLOW_WEAK=${ALLOW_WEAK:-""}
+ALLOW_DOWNGRADE_TO_INSECURE=${ALLOW_DOWNGRADE_TO_INSECURE:-""}
+TRUSTED=${TRUSTED:-""}
+
+# Signature file (must be set)
+SIGNATURE=${SIGNATURE:-}
+
+# Validity checks, optional
+CHECK_VALID=${CHECK_VALID:-""}
+VALID_UNTIL_MIN=${VALID_UNTIL_MIN:-""}
+VALID_UNTIL_MAX=${VALID_UNTIL_MAX:-""}
+
+# SUITES and COMPONENTS are special cases, and have dependent requirements
+case "$SUITES" in
+    # Check if it is an exact (i.e. absolute) path
+    /*/)
+        if [ -z "$COMPONENTS" ]; then
+            exit_error "COMPONENTS must NOT be set when SUITES is an absolute path"
+        fi
+        ;;
+    # Otherwise, it should be a distribution name
+    *)
+        # Check if it contains a slash
+        if [[ "$SUITES" =~ '/' ]]; then
+            exit_error "When SUITES is a Distribution name, slashes are not allowed, see --help for more information"
+        fi
+        
+        if [ -z "$COMPONENTS" ]; then
+            # When SUITES is a distribution name, COMPONENTS must be set
+            exit_error "At least one COMPONENT must be set when SUITES is a Distribution name, see --help for more information"
+        fi
+        ;;
+esac
+
+# Check if other required arguments are missing
+declare -a REQUIRED_ARGS_MISSING=();
+
+[ -z "$TYPES" ] && REQUIRED_ARGS_MISSING+=("TYPES")
+[ -z "$URIS" ] && REQUIRED_ARGS_MISSING+=("URIS")
+[ -z "$SIGNATURE" ] && REQUIRED_ARGS_MISSING+=("SIGNATURE")
+
+if [ ${#REQUIRED_ARGS_MISSING[@]} -gt 0 ]; then
+    exit_error "Missing required arguments: ${REQUIRED_ARGS_MISSING[*]}, use --help for more information"
+fi
+
+# Generate the option prefixes depending on the format
+if [ "$FORMAT" == "DEB822" ]; then
+    
+    ARCH_PREFIX="Architectures: "
+    ALLOW_INSECURE_PREFIX="Allow-Insecure: "
+    ALLOW_DOWNGRADE_TO_INSECURE_PREFIX="Allow-Downgrade-To-Insecure: "
+
+    ALLOW_WEAK_PREFIX="Allow-Weak: "
+    CHECK_VALID_PREFIX="Check-Valid: "
+    ENABLED_PREFIX="Enabled:" # no space at the end!
+
+    BY_HASH_PREFIX="By-Hash: "
+    LANG_PREFIX="Languages: "
+    PDIFF_PREFIX="PDiffs: "
+    
+    TARGET_PREFIX="Targets: "
+    TRUSTED_PREFIX="Trusted: "
+    VALID_UNTIL_MAX_PREFIX="Valid-Until-Max: "
+
+    VALID_UNTIL_MIN_PREFIX="Valid-Until-Min: "
+elif [ "$FORMAT" == "OLS" ]; then
+    ARCH_PREFIX="arch="
+    ALLOW_INSECURE_PREFIX="allow-insecure="
+    ALLOW_WEAK_PREFIX="allow-weak="
+
+    ALLOW_DOWNGRADE_TO_INSECURE_PREFIX="allow-downgrade-to-insecure="
+    BY_HASH_PREFIX="by-hash="
+    LANG_PREFIX="lang="
+    
+    PDIFF_PREFIX="pdiff="
+    TARGET_PREFIX="target="
+    TRUSTED_PREFIX="trusted="
+    
+    CHECK_VALID_PREFIX="check-valid="
+    VALID_UNTIL_MAX_PREFIX="valid-until-max="
+    VALID_UNTIL_MIN_PREFIX="valid-until-min="
+fi
+
+# Generate the option strings if the respective option is set
+if [ "$FORMAT" == "DEB822" ] ; then
+    # Enabled is only available in DEB822 format
+    if [ "$ENABLED" == true ]; then
+        ENABLED_STRING="$ENABLED_PREFIX yes"
+    elif [ "$ENABLED" == false ]; then
+        ENABLED_STRING="$ENABLED_PREFIX no"
+    fi
+elif [ "$FORMAT" = "OLS" ]; then
+    # Enabled is not actually an option in OLS format
+    if [ "$ENABLED" == false ]; then
+        # However, if enabled=false, we can use this variable to comment out the line, effectively disabling it
+        ENABLED_STRING="#"
+    fi
+fi
+
+if [ "$ARCHITECTURE" != "" ]; then
+    ARCH_STRING="$ARCH_PREFIX$ARCHITECTURE"
+fi
+if [ "$ALLOW_INSECURE" != "" ]; then
+    ALLOW_INSECURE_STRING="$ALLOW_INSECURE_PREFIX$ALLOW_INSECURE"
+fi
+if [ "$ALLOW_WEAK" != "" ]; then
+    ALLOW_WEAK_STRING="$ALLOW_WEAK_PREFIX$ALLOW_WEAK"
+fi
+
+if [ "$ALLOW_DOWNGRADE_TO_INSECURE" != "" ]; then
+    ALLOW_DOWNGRADE_TO_INSECURE_STRING="$ALLOW_DOWNGRADE_TO_INSECURE_PREFIX$ALLOW_DOWNGRADE_TO_INSECURE"
+fi
+if [ "$CHECK_VALID" != "" ]; then
+    CHECK_VALID_STRING="$CHECK_VALID_PREFIX$CHECK_VALID"
+fi
+if [ "$BY_HASH" != "" ]; then
+    BY_HASH_STRING="$BY_HASH_PREFIX$BY_HASH"
+fi
+
+if [ "$LANGUAGE" != "" ]; then
+    LANG_STRING="$LANG_PREFIX$LANGUAGE"
+fi
+if [ "$PDIFF" != "" ]; then
+    PDIFF_STRING="$PDIFF_PREFIX$PDIFF"
+fi
+if [ "$TARGET" != "" ]; then
+    TARGET_STRING="$TARGET_PREFIX$TARGET"
+fi
+
+if [ "$TRUSTED" != "" ]; then
+    TRUSTED_STRING="$TRUSTED_PREFIX$TRUSTED"
+fi
+if [ "$VALID_UNTIL_MIN" != "" ]; then
+    VALID_UNTIL_MIN_STRING="$VALID_UNTIL_MIN_PREFIX$VALID_UNTIL_MIN"
+fi
+if [ "$VALID_UNTIL_MAX" != "" ]; then
+    VALID_UNTIL_MAX_STRING="$VALID_UNTIL_MAX_PREFIX$VALID_UNTIL_MAX"
+fi
+
+ENABLED_STRING=${ENABLED_STRING:-""}
+
+# Set default values for optional options to empty string if not set
+ARCH_STRING=${ARCH_STRING:-""}
+ALLOW_INSECURE_STRING=${ALLOW_INSECURE_STRING:-""}
+ALLOW_WEAK_STRING=${ALLOW_WEAK_STRING:-""}
+
+ALLOW_DOWNGRADE_TO_INSECURE_STRING=${ALLOW_DOWNGRADE_TO_INSECURE_STRING:-""}
+CHECK_VALID_STRING=${CHECK_VALID_STRING:-""}
+BY_HASH_STRING=${BY_HASH_STRING:-""}
+
+LANG_STRING=${LANG_STRING:-""}
+PDIFF_STRING=${PDIFF_STRING:-""}
+TARGET_STRING=${TARGET_STRING:-""}
+
+TRUSTED_STRING=${TRUSTED_STRING:-""}
+VALID_UNTIL_MIN_STRING=${VALID_UNTIL_MIN_STRING:-""}
+VALID_UNTIL_MAX_STRING=${VALID_UNTIL_MAX_STRING:-""}
+
+if [ "$VERBOSE" -ge 2 ]; then 
+    printf "Variables:\n"
+    printf "  VERBOSE: $VERBOSE\n"
+    printf "  FORCE: $FORCE\n"
+    printf "  FORMAT: $FORMAT\n"
+    printf "  LOCATION: $LOCATION\n"
+    printf "  COMPONENTS: $COMPONENTS\n"
+    printf "  SUITES: $SUITES\n"
+    printf "  TYPES: $TYPES\n"
+    printf "  URIS: $URIS\n"
+    printf "  NAME: $NAME\n"
+    printf ""
+    
+    printf "  ARCHITECTURE: $ARCHITECTURE ➡️ (string) '$ARCH_STRING'\n"
+    printf "  ALLOW_INSECURE: $ALLOW_INSECURE ➡️ (string) '$ALLOW_INSECURE_STRING '\n"
+    printf "  ALLOW_WEAK: $ALLOW_WEAK ➡️ (string) '$ALLOW_WEAK_STRING'\n"
+    
+    printf "  ALLOW_DOWNGRADE_TO_INSECURE: $ALLOW_DOWNGRADE_TO_INSECURE\n"
+    printf "  CHECK_VALID: $CHECK_VALID ➡️ (string) '$CHECK_VALID_STRING'\n"
+    printf "  ENABLED: $ENABLED ➡️ (string) '$ENABLED_STRING'\n"
+    
+    printf "  BY_HASH: $BY_HASH ➡️ (string) '$BY_HASH_STRING'\n"
+    printf "  LANGUAGE: $LANGUAGE ➡️ (string) '$LANGUAGE_STRING'\n"
+    printf "  PDIFF: $PDIFF ➡️ (string) '$PDIFF_STRING'\n"
+    
+    printf "  SIGNATURE: $SIGNATURE\n"
+    printf "  TARGET: $TARGET ➡️ (string) '$TARGET_STRING'\n"
+    printf "  TRUSTED: $TRUSTED ➡️ (string) '$TRUSTED_STRING'\n"
+    
+    printf "  VALID_UNTIL_MIN: $VALID_UNTIL_MIN ➡️ (string) '$VALID_UNTIL_MIN_STRING'\n"
+    printf "  VALID_UNTIL_MAX: $VALID_UNTIL_MAX ➡️ (string) '$VALID_UNTIL_MAX_STRING'\n"
+
+    printf "\n"
+fi
+
+
+if [ "$FORMAT" == "DEB822" ]; then
+    # New (Long) format
+    FILE_EXT=.sources
+    FILE="$LOCATION/$NAME$FILE_EXT"
+    TMP_FILE="/tmp/$NAME.sources.tmp"
+
+    # # Write the content to a temporary file
+    {
+        printf "$ENABLED_STRING\n"
+        printf "Types: $TYPES\n"
+        printf "URIs: $URIS\n"
+        printf "Suites: $SUITES\n"
+        printf "Components: $COMPONENTS\n"
+        printf "Signed-By: $SIGNATURE\n"
+        [ ! -z "$ARCH_STRING" ] && printf "$ARCH_STRING\n"
+        [ ! -z "$LANG_STRING" ] && printf "$LANG_STRING\n"
+        [ ! -z "$TARGET_STRING" ] && printf "$TARGET_STRING\n"
+        [ ! -z "$PDIFF_STRING" ] && printf "$PDIFF_STRING\n"
+        [ ! -z "$BY_HASH_STRING" ] && printf "$BY_HASH_STRING\n"
+        [ ! -z "$TRUSTED_STRING" ] && printf "$TRUSTED_STRING\n"
+        [ ! -z "$ALLOW_INSECURE_STRING" ] && printf "$ALLOW_INSECURE_STRING\n"
+        [ ! -z "$ALLOW_WEAK_STRING" ] && printf "$ALLOW_WEAK_STRING\n"
+        [ ! -z "$ALLOW_DOWNGRADE_TO_INSECURE_STRING" ] && printf "$ALLOW_DOWNGRADE_TO_INSECURE_STRING\n"
+        [ ! -z "$CHECK_VALID_STRING" ] && printf "$CHECK_VALID_STRING\n"
+        [ ! -z "$VALID_UNTIL_MIN_STRING" ] && printf "$VALID_UNTIL_MIN_STRING\n"
+        [ ! -z "$VALID_UNTIL_MAX_STRING" ] && printf "$VALID_UNTIL_MAX_STRING\n"
+    } > "$TMP_FILE"
+
+    if [ -f "$LOCATION/$NAME$FILE_EXT" ]; then
+        # File exists, check if it contains the same options
+        if cmp -s "$TMP_FILE" "$FILE"; then
+            # File exists and contains the same options, skip
+            [ "$VERBOSE" -gt 0 ] && echo "Exact source-file already exists, skipping..."
+        else
+            # File exists but contains different options, overwrite
+            if [ "$FORCE" == false ]; then
+                # Remove temporary file
+                rm "$TMP_FILE"
+                # Do not overwrite, exit with error
+                exit_error "File $FILE exists, but differs, use -f to forve overwrite"
+            else 
+                # Force overwrite
+                [ "$VERBOSE" -gt 0 ] && echo "Source already exists, overwriting..."
+                mv "$TMP_FILE" "$FILE"
+            fi
+        fi
+    else
+        # File does not exist, rename temporary file
+        [ "$VERBOSE" -gt 0 ] && printf "Source file will be created at %s\n" "$FILE"
+        mv "$TMP_FILE" "$FILE"
+    fi
+    # Remove temporary file
+    rm "$TMP_FILE"
+
+elif [ "$FORMAT" == "OLS" ]; then
+    # One Line Format
+    FILE_EXT=.list
+    FILE="$LOCATION/$NAME$FILE_EXT"
+    TMP_FILE=/tmp/$NAME.list.tmp
+    declare -a OPTS=($ARCH_STRING $LANG_STRING $TARGET_STRING $PDIFF_STRING $BY_HASH_STRING $TRUSTED_STRING $ALLOW_INSECURE_STRING $ALLOW_WEAK_STRING $ALLOW_DOWNGRADE_TO_INSECURE_STRING $CHECK_VALID_STRING $VALID_UNTIL_MIN_STRING $VALID_UNTIL_MAX_STRING)
+    OPT_STRING="[signed-by $SIGNATURE"
+    for OPT in "${OPTS[@]}"; do
+        if [ ! -z "$OPT" ]; then
+            OPT_STRING="$OPT_STRING $OPT"
+        fi
+    done
+    OPT_STRING="$OPT_STRING]"
+    SOURCE_LINE="$TYPES $OPT_STRING $URIS $SUITES $COMPONENTS"
+    [ "$ENABLED_STRING" != "" ] && SOURCE_LINE="$ENABLED_STRING $SOURCE_LINE"
+    echo "$SOURCE_LINE" > "$TMP_FILE"
+    # Check if the file already exists
+    if [ -f "$FILE" ]; then
+        # File exists, check if it contains the same options
+        [ "$VERBOSE" -gt 0 ] && printf "Checking if %s contents match ' %s '\n" "$SOURCE_LINE" "$FILE"
+         # File exists and contains the same options, exit
+        if cmp -s "$TMP_FILE" "$FILE"; then
+            [ "$VERBOSE" -gt 0 ] && printf "Exact source-file already exists, skipping...\n"
+        else
+            # File exists but contains different options, exit
+            if [ $FORCE == false ]; then    
+                # Remove temporary file
+                rm "$TMP_FILE"
+                exit_error "File $FILE exists, but content differs, use -f to force overwrite"
+            else
+                # File exists but contains different options, overwrite
+                [ "$VERBOSE" -gt 0 ] && printf "Source already exists, overwriting...\n"
+                mv "$TMP_FILE" "$FILE"
+            fi
+        fi
+    else
+        # File does not exist, create it
+        [ "$VERBOSE" -gt 0 ] && printf "Source file will be created at %s\n" "$FILE"
+        mv "$TMP_FILE" "$FILE"
+    fi
+else
+    exit_error "Unknown format: $FORMAT, must be 'DEB822' or 'OLS', use --help for more information"
+fi
+
+# Exit with success
+exit 0

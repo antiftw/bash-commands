@@ -1,0 +1,47 @@
+#!/bin/bash
+
+# Local function definition
+exit_error() {
+  printf "\nAborting: \n\n%s\n\n" "$1" >&2
+  exit 1
+}
+
+for arg in "$@"; do
+    case "$arg" in
+        -h|--help)
+            echo ""
+            echo "This script can be used to add the apt commands to your system"
+            echo "First make sure that you have configured which commands you want to add, by editing the add-cmd-key.conf file"
+            echo "Usage: ./add-cmd-key [-i=<install-path> ]"
+            echo "  -i, --install-path=<path>  The path where the commands will be installed (default: /usr/local/bin)"
+            echo ""
+            echo "  -h, --help                 Show this help message"
+            echo ""
+            exit 0
+            ;;
+        -i=*|--install-path=*)
+            INSTALL_PATH="${arg#*=}"
+            shift
+            ;;
+    esac
+done
+
+
+# Check if script is run as root
+if [ "$(id -u)" != "0" ]; then
+    exit_error "must run as root"
+fi
+
+# Read config file
+if [ -f "$PWD/add-cmd-key.conf" ]; then
+  . "$PWD/add-cmd-key.conf"
+fi
+
+INSTALL_PATH=${INSTALL_PATH:-"/usr/local/bin"}
+
+declare -a APT_COMMANDS=(apt-key-add apt-src-add)
+
+for CMD in "${APT_COMMANDS[@]}"; do
+  cp "$PWD/apt/$CMD" "$INSTALL_PATH"
+  chmod +ax "$INSTALL_PATH/$CMD"
+done
