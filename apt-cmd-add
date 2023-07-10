@@ -43,5 +43,5 @@ declare -a APT_COMMANDS=(apt-key-add apt-src-add)
 
 for CMD in "${APT_COMMANDS[@]}"; do
   cp "$PWD/apt/$CMD" "$INSTALL_PATH"
-  chmod +ax "$INSTALL_PATH/$CMD"
+  chmod a+x "$INSTALL_PATH/$CMD"
 done
