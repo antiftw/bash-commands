@@ -42,7 +42,7 @@ A description of how to use the various scripts and commands in this repository.
 
 Usually you want to run this command by using:
 
-```bash 
+```bash
 apt-key-add 
 -i=https://updates.signal.org/desktop/apt/keys.asc 
 -o=signal-desktop 
