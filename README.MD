@@ -51,9 +51,9 @@ apt-key-add
 -sc='main'
 ```
 
-Since the `-su`, `-ss` and `-sc` parameters are passed to the function, this call will also invoke `apt-src-add` and add the corresponding repository to `sources.list.d/`.
+When the `-su`, `-ss` and `-sc` parameters are passed to the function, this call will also invoke `apt-src-add` and add the corresponding repository to `sources.list.d/`.
 
-In this call, the `-o` flag is optional to give it a distinct name, which is recommended in this case because the name `keys.asc` is rather which would be used otherwise is rather non-descriptive.
+When issuing this command, the `-o` flag is optional to give it a distinct name, which is recommended in this specific case because the name `keys.asc` - which would be used otherwise - is rather non-descriptive.
 
 For a more detailed overview of all the possibilities look inside inside the file itself or get it by using the help function:
 
