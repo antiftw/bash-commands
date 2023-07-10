@@ -218,11 +218,45 @@ if [ "$VERBOSE" -ge 2 ]; then
     printf "\n"
 fi
 
-# If we are going to add a source: check if apt-src-add is installed
-if [ ! -z "$SOURCE_URI" ] || [ ! -z "$SOURCE_SUITES" ] || [ ! -z "$SOURCE_COMPONENTS" ] ; then
+
+if [ ! -z "$SOURCE_URI" ] || [ ! -z "$SOURCE_SUITES" ] || [ ! -z "$SOURCE_COMPONENTS" ] || [ ! -z "$SOURCE_SIGNATURE" ]; then
+    # If we are going to add a source: check if apt-src-add is installed
     if [ ! "$(command -v apt-src-add)" ]; then
         exit_error "apt-src-add command is not recognized"
     fi
+    # If one of them is set, SOURCE_URI, SOURCE_SIGNATURE and SOURCE_SUITES must be set
+    if [ -z "$SOURCE_URI" ]; then
+        exit_error "SOURCE_URI must be set when adding a source"
+    elif [ -z "$SOURCE_SIGNATURE" ]; then
+        exit_error "SOURCE_SIGNATURE must be set when adding a source"
+    elif [ -z "$SOURCE_SUITES" ]; then
+        exit_error "SOURCE_SUITES must be set when adding a source"
+    fi
+
+    # The reuired value of SOURCE_COMPONENTS depends on the value of SOURCE_SUITES
+    case "$SUITES" in
+        # Check if it is an exact path (ending with /)
+        */)
+            # Meaning COMPONENTS must be empty
+            if [ ! -z "$COMPONENTS" ]; then
+                exit_error "COMPONENTS must NOT be set when SUITES is an absolute path"
+            fi
+            
+            ;;
+        # Otherwise, it should be a distribution name
+        *)
+            # Meaning SUITES cannot contain slashes
+            if [[ "$SUITES" =~ '/' ]]; then
+                exit_error "When SUITES is a Distribution name, slashes are not allowed, see --help for more information"
+            fi
+            
+            if [ -z "$COMPONENTS" ]; then
+                # When SUITES is a distribution name, COMPONENTS must be set
+                exit_error "At least one COMPONENT must be set when SUITES is a Distribution name, see --help for more information"
+            fi
+            ;;
+    esac
+
 fi
 
 # Initialize return code

@@ -95,4 +95,4 @@ The command is written to support all options from the RFC, however only the bas
 ## Resources
 
 - [About the different .sources.d/ formats](https://repolib.readthedocs.io/en/latest/deb822-format.html)
-- [Sources.list mappages](https://manpages.debian.org/stretch/apt/sources.list.5.en.html)
+- [Sources.list man pages](https://manpages.debian.org/stretch/apt/sources.list.5.en.html)

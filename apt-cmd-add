@@ -15,17 +15,35 @@ for arg in "$@"; do
             echo "Usage: ./add-cmd-key [-i=<install-path> ]"
             echo "  -i, --install-path=<path>  The path where the commands will be installed (default: /usr/local/bin)"
             echo ""
+            echo "  -f --force                 Force overwrite of existing commands"
+            echo ""
             echo "  -h, --help                 Show this help message"
+            echo ""
+            echo "  -v(v), --v(v)erbose            Verbose output, allowed values: 0, 1, 2:"
+            echo "                                  - 0 - no verbose output (default)"
+            echo "                                  - 1 - verbose output (-v) (show main steps)"
+            echo "                                  - 2 - extra verbose output (-vv) (dump variables)"
             echo ""
             exit 0
             ;;
+        -f|--force)
+            FORCE=true
+            ;;
         -i=*|--install-path=*)
             INSTALL_PATH="${arg#*=}"
-            shift
+            ;;
+        -v|--verbose)
+            VERBOSE=1
+            ;;
+        -vv|--vverbose)
+            VERBOSE=2
             ;;
     esac
 done
 
+# Set default values
+FORCE=${FORCE:-0}
+VERBOSE=${VERBOSE:-0}
 
 # Check if script is run as root
 if [ "$(id -u)" != "0" ]; then
@@ -34,6 +52,7 @@ fi
 
 # Read config file
 if [ -f "$PWD/add-cmd-key.conf" ]; then
+  [ "$VERBOSE" -ge 1 ] && printf "[DEBUG] Reading config file $PWD/add-cmd-key.conf\n" >&2
   . "$PWD/add-cmd-key.conf"
 fi
 
@@ -41,7 +60,34 @@ INSTALL_PATH=${INSTALL_PATH:-"/usr/local/bin"}
 
 declare -a APT_COMMANDS=(apt-key-add apt-src-add)
 
+if [ "$VERBOSE" -ge 2 ]; then
+  printf "\n[DEBUG] VERBOSE: %s\n" "$VERBOSE"
+  printf "[DEBUG] FORCE: %s\n" "$FORCE"
+  printf "[DEBUG] INSTALL_PATH: %s\n" "$INSTALL_PATH"
+  printf "[DEBUG] APT_COMMANDS: %s\n" "${APT_COMMANDS[*]}"
+  printf "[DEBUG] PWD: %s\n\n" "$PWD"
+
+fi
+
 for CMD in "${APT_COMMANDS[@]}"; do
-  cp "$PWD/apt/$CMD" "$INSTALL_PATH"
-  chmod a+x "$INSTALL_PATH/$CMD"
+    if [ "install-$CMD" ]; then
+      # Check if file exists
+      if [ -f "$INSTALL_PATH/$CMD" ]; then
+        if [ "$FORCE" = true ]; then
+          [ "$VERBOSE" -ge 1 ] && printf "[DEBUG] File $INSTALL_PATH/$CMD already exists, overwriting\n"
+          rm "$INSTALL_PATH/$CMD"
+        else
+          [ "$VERBOSE" -ge 1 ] && printf "[DEBUG] File $INSTALL_PATH/$CMD already exists, skipping\n"
+          continue
+        fi
+      fi
+      # Copy file to install path
+      [ "$VERBOSE" -ge 1 ] && printf "[DEBUG] Copying file [ $PWD/apt/$CMD ] to [ $INSTALL_PATH ]\n"
+      cp "$PWD/apt/$CMD" "$INSTALL_PATH"
+      # Make file executable
+      chmod a+x "$INSTALL_PATH/$CMD"
+    else
+      [ "$VERBOSE" -ge 1 ] && printf "[DEBUG] File [ $CMD ] not to be installed, skipping\n"
+      continue 1
+    fi
 done

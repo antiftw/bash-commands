@@ -262,15 +262,15 @@ VALID_UNTIL_MAX=${VALID_UNTIL_MAX:-""}
 
 # SUITES and COMPONENTS are special cases, and have dependent requirements
 case "$SUITES" in
-    # Check if it is an exact (i.e. absolute) path
-    /*/)
+    # Check if it is an exact path (i.e. end with a slash)
+    */)
         if [ -z "$COMPONENTS" ]; then
-            exit_error "COMPONENTS must NOT be set when SUITES is an absolute path"
+            exit_error "COMPONENTS must NOT be set when SUITES is an exact path"
         fi
         ;;
     # Otherwise, it should be a distribution name
     *)
-        # Check if it contains a slash
+        # Meaning SUITES cannot contain slashes
         if [[ "$SUITES" =~ '/' ]]; then
             exit_error "When SUITES is a Distribution name, slashes are not allowed, see --help for more information"
         fi
