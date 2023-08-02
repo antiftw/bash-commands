@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# Print the status of a command, in the following form:
+# ======= <symbol> <command> <symbol> =======
+
+# Usage:
+# cmd-status <status> <command>
+
+# Example:
+# cmd-status begin "echo hello"
+# cmd-status end "echo hello"
+
+STATUS=$1
+COMMAND=$2
+COMMAND_LENGTH=${#COMMAND}
+WIDTH=$(tput cols)
+
+case $STATUS in
+    begin)
+        SYMBOL=$(blue-cog)
+        COLOR=BLUE
+        
+        ;;
+    end)
+        SYMBOL=$(green-check)
+        COLOR=GREEN
+        ;;
+    error)
+        SYMBOL=$(red-cross)
+        COLOR=RED
+        ;;
+    *)
+        SYMBOL=""
+        COLOR=WHITE
+        ;;
+esac
+
+divider
+print-output "$SYMBOL $COMMAND $SYMBOL" $COLOR true
+divider

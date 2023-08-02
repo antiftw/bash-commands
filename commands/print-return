@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Print output corresponding to return status of a command
+INDENT=$1
+RETURN_STATUS=$2
+
+if [ "$RETURN_STATUS" -eq 0 ]; then 
+    SYMBOL=$(green-check)
+elif [ "$RETURN_STATUS" -eq 1 ]; then
+    SYMBOL=$(red-cross)
+else 
+    SYMBOL=" "
+fi
+
+# Print output
+printf "%"$INDENT"s $SYMBOL |\n" " "

@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# Execute a command and print the output
+# $1: command to execute
+# $2: indent level
+# $3: print command
+# $4: print output
+# $5: print return status
+# $6: print divider
+
+# Set defaults
+INDENT=${2:-0}
+
+
+# Execute command
+eval $1
+
+

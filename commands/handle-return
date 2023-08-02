@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# Handle return status of a command
+
+if [ "$RETURN_STATUS" -eq 0 ]; then
+  color-text GREEN "✔"
+else
+  color-text RED "✘"
+fi

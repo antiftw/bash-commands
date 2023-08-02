@@ -1,0 +1,3 @@
+#!/bin/bash
+# Prints a green checkmark
+color-text ✔ GREEN

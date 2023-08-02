@@ -1,0 +1,12 @@
+#!/bin/bash
+# Run apt update and upgrade at the same time
+
+print-output "Updating and upgrading apt packages"; INDENT=$?
+
+# If the user is not root, run the commands with sudo
+if [[ $EUID -ne 0 ]]; then
+    sudo apt update && sudo apt upgrade -y 
+else
+    apt update && apt upgrade -y
+fi
+

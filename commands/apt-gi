@@ -1,0 +1,18 @@
+#!/bin/bash 
+
+# Run apt-get install with a package name
+
+print-output "Installing $1"; INDENT=$?
+
+# If the user is not root, run the commands with sudo
+if [[ $EUID -ne 0 ]]; then
+    sudo apt-get install --assume-yes -qq "$1" 
+else
+    apt-get install --assume-yes -qq "$1"
+fi
+
+# Print output corresponding to return status of a command
+print-return $? $INDENT
+
+# Print a divider
+divider

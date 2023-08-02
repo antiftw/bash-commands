@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Print error message to the terminal
+
+# Parameter $1 : The text to print
+
+# Give help text if no arguments are given, or if argument is -h or --help
+
+if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+    echo ""
+    echo "This script can be used to print error messages to the terminal"
+    echo "Usage: print-error <text>"
+    echo "  text    The text to print"
+    echo ""
+    exit 0
+fi
+
+# Print text
+print-output "Error: $1" true 1

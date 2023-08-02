@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# Print nice readable output to the terminal
+
+# Parameter $1 : The text to print
+# Parameter $2 : Whether we want to directly print return status (optional: defaults to false)
+# Parameter $3 : What the exit status is (optional: defaults to -1)
+
+# Give help text if no arguments are given, or if argument is -h or --help
+if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+    echo ""
+    echo "This script can be used to print nice readable output to the terminal"
+    echo "Usage: print-output <text> [color] [return]"
+    echo "  text    The text to print"
+    echo "  return  Whether we want to directly print return status (optional: defaults to false)"
+    echo ""
+    exit 0
+fi
+
+RETURN=${2:-false}
+RETURN_STATUS=${3:-1}
+WIDTH=$(tput cols)
+
+# -6 is for the 6 characters that are added to the text 
+# (<|><space><TEXT><space><symbol><|><space>), makes 6 characters
+REMAINING_SPACE=$(($WIDTH-${#1}-6))
+
+# Print text
+printf "│ %s" "$1"
+
+if [ "$RETURN" = true ]; then
+    print-return "$REMAINING_SPACE" "$RETURN_STATUS"
+    exit 0
+fi
+# Return remaining space
+exit $REMAINING_SPACE

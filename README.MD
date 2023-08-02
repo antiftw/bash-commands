@@ -96,3 +96,4 @@ The command is written to support all options from the RFC, however only the bas
 
 - [About the different .sources.d/ formats](https://repolib.readthedocs.io/en/latest/deb822-format.html)
 - [Sources.list man pages](https://manpages.debian.org/stretch/apt/sources.list.5.en.html)
+- [Bash redirection](https://web.archive.org/web/20230315225157/https://wiki.bash-hackers.org/howto/redirection_tutorial)

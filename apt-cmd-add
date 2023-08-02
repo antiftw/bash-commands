@@ -1,9 +1,23 @@
 #!/bin/bash
 
-# Local function definition
+COMMAND_ADD_CONFIG_FILE="apt-cmd-add.conf"
+
 exit_error() {
-  printf "\nAborting: \n\n%s\n\n" "$1" >&2
-  exit 1
+    # print errpr message 
+    printf "\n\033[0;31mERROR:\033[0m $1\n\n" >&2
+    exit 1
+}
+
+print_output() {
+  printf "\n%s\n" "$1"
+}
+
+# Print commands from array with a newline between each command
+# Parameter $1 : Array of commands
+print_commands() {
+    for COMMAND in "${@}"; do
+        printf "  %s\n" "$COMMAND"
+    done
 }
 
 for arg in "$@"; do
@@ -24,6 +38,9 @@ for arg in "$@"; do
             echo "                                  - 1 - verbose output (-v) (show main steps)"
             echo "                                  - 2 - extra verbose output (-vv) (dump variables)"
             echo ""
+            echo "  -w, --write-config         Write config file with all commands"
+            echo "                             (reads the commands from the commands/ directory)"                         
+            echo ""
             exit 0
             ;;
         -f|--force)
@@ -32,17 +49,23 @@ for arg in "$@"; do
         -i=*|--install-path=*)
             INSTALL_PATH="${arg#*=}"
             ;;
+        -l=*|--logfile=*)
+            CUSTOM_LOGFILE="${arg#*=}"
+            ;;
         -v|--verbose)
             VERBOSE=1
             ;;
         -vv|--vverbose)
             VERBOSE=2
             ;;
+        -w|--write-config)
+            WRITE_CONFIG=true
+            ;;
     esac
 done
 
 # Set default values
-FORCE=${FORCE:-0}
+FORCE=${FORCE:-false}
 VERBOSE=${VERBOSE:-0}
 
 # Check if script is run as root
@@ -50,44 +73,114 @@ if [ "$(id -u)" != "0" ]; then
     exit_error "must run as root"
 fi
 
+# Write config file if requested, by listing all commands in commands/ and writing them to the config file
+if [ "$WRITE_CONFIG" = true ]; then
+    # If config file already exists and force is not true, ask if we want to overwrite it
+    if [ -f "$COMMAND_ADD_CONFIG_FILE" ]; then
+        if [ "$FORCE" = false ]; then
+            read -p "Config file already exists, do you want to overwrite it? (y/n) " -n 1 -r
+            echo ""
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                exit 0
+            fi
+        fi
+        echo "# Configuration file for apt-scr-add script" > "$COMMAND_ADD_CONFIG_FILE"
+        echo "# Commands to add to distro" >> "$COMMAND_ADD_CONFIG_FILE"
+        echo "# Format: <command>=<true|false>" >> "$COMMAND_ADD_CONFIG_FILE"
+    else
+        # Create config file
+        touch "$COMMAND_ADD_CONFIG_FILE"
+    fi    
+    
+    # Write commands to config file
+    for COMMAND in commands/*; do
+        # Ignore directories
+        if [ -d "$COMMAND" ]; then
+            continue
+        fi
+
+        # Strip commands/ from command
+        COMMAND=${COMMAND#commands/}
+
+        # Write command to config file
+        echo "$COMMAND=true" >> "$COMMAND_ADD_CONFIG_FILE"
+    done
+    
+    # Exit script
+    exit 0
+fi
+
+
+
+
+declare -a COMMANDS=()
+
 # Read config file
-if [ -f "$PWD/add-cmd-key.conf" ]; then
-  [ "$VERBOSE" -ge 1 ] && printf "[DEBUG] Reading config file $PWD/add-cmd-key.conf\n" >&2
-  . "$PWD/add-cmd-key.conf"
+if [ -f "$COMMAND_ADD_CONFIG_FILE" ]
+then  readarray -t COMMANDS < "$COMMAND_ADD_CONFIG_FILE"
+else  exit_error "config file not found"
 fi
 
 INSTALL_PATH=${INSTALL_PATH:-"/usr/local/bin"}
 
-declare -a APT_COMMANDS=(apt-key-add apt-src-add)
-
 if [ "$VERBOSE" -ge 2 ]; then
-  printf "\n[DEBUG] VERBOSE: %s\n" "$VERBOSE"
-  printf "[DEBUG] FORCE: %s\n" "$FORCE"
-  printf "[DEBUG] INSTALL_PATH: %s\n" "$INSTALL_PATH"
-  printf "[DEBUG] APT_COMMANDS: %s\n" "${APT_COMMANDS[*]}"
-  printf "[DEBUG] PWD: %s\n\n" "$PWD"
-
+  print_output "VERBOSE: $VERBOSE"
+  print_output "FORCE: $FORCE"
+  print_output "INSTALL_PATH: $INSTALL_PATH"
 fi
 
-for CMD in "${APT_COMMANDS[@]}"; do
-    if [ "install-$CMD" ]; then
-      # Check if file exists
-      if [ -f "$INSTALL_PATH/$CMD" ]; then
-        if [ "$FORCE" = true ]; then
-          [ "$VERBOSE" -ge 1 ] && printf "[DEBUG] File $INSTALL_PATH/$CMD already exists, overwriting\n"
-          rm "$INSTALL_PATH/$CMD"
-        else
-          [ "$VERBOSE" -ge 1 ] && printf "[DEBUG] File $INSTALL_PATH/$CMD already exists, skipping\n"
-          continue
-        fi
-      fi
-      # Copy file to install path
-      [ "$VERBOSE" -ge 1 ] && printf "[DEBUG] Copying file [ $PWD/apt/$CMD ] to [ $INSTALL_PATH ]\n"
-      cp "$PWD/apt/$CMD" "$INSTALL_PATH"
-      # Make file executable
-      chmod a+x "$INSTALL_PATH/$CMD"
-    else
-      [ "$VERBOSE" -ge 1 ] && printf "[DEBUG] File [ $CMD ] not to be installed, skipping\n"
-      continue 1
+# Create install path if it does not exist
+if [ ! -d "$INSTALL_PATH" ]; then
+    mkdir -p "$INSTALL_PATH"
+fi
+declare -a COMMANDS_SKIPPED=()
+declare -a COMMANDS_INSTALLED=()
+
+# Loop through commands
+for COMMAND in "${COMMANDS[@]}"
+do
+    # Ignore rule if it starts with #
+    if [[ "$COMMAND" == \#* ]]; then
+        continue
+    fi
+
+    # Ignore empty lines
+    if [ -z "$COMMAND" ]; then
+        continue
+    fi
+    # command is of format <command>=<boolean>
+    # Split command seperated by =
+    COMMAND_NAME=$(echo "$COMMAND" | cut -d'=' -f1)
+    BOOLEAN=$(echo "$COMMAND" | cut -d'=' -f2)
+    
+    # Check if we should install command
+    if [ ! "$BOOLEAN" ]; then
+        continue
+    fi
+
+    # Check if command is already installed
+    if [ -f "$INSTALL_PATH/$COMMAND_NAME" ] && [ "$FORCE" == false ]; then
+        print_output "Command $COMMAND_NAME already exists, use -f to force overwrite"
+        COMMANDS_SKIPPED+=("$COMMAND_NAME")
+        continue
+    fi
+
+    # Copy command to install path
+    cp "$PWD/commands/$COMMAND_NAME" "$INSTALL_PATH/$COMMAND_NAME";
+    if [ $? -eq 0 ]; then
+        chmod a+x "$INSTALL_PATH/$COMMAND_NAME"
+        COMMANDS_INSTALLED+=("$COMMAND_NAME")
     fi
 done
+
+# Print skipped commands
+if [ "$VERBOSE" -ge 1 ] && [ ${#COMMANDS_SKIPPED[@]} -gt 0 ]; then
+    print_output "Skipped commands:"
+    print_commands "${COMMANDS_SKIPPED[@]}"
+fi
+
+# Print installed commands
+if [ "$VERBOSE" -ge 1 ] && [ ${#COMMANDS_INSTALLED[@]} -gt 0 ]; then
+    print_output "Installed commands:"
+    print_commands "${COMMANDS_INSTALLED[@]}"
+fi

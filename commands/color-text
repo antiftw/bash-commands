@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Function to print a given text in a given color
+# Parameter $1 : Which text should be printed
+# Parameter $2 :  Which color the text should be
+
+case $2 in
+    RED)    COLOR=31;;
+    GREEN)  COLOR=32;;
+    YELLOW) COLOR=33;;
+    BLUE)   COLOR=34;;
+    PURPLE) COLOR=35;;
+    CYAN)   COLOR=36;;
+    WHITE)  COLOR=37;;
+    *)      COLOR=00;;
+esac
+echo -en "\033[${COLOR}m$1\033[00m"

@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# Prints a colored divider for the full width of the terminal (default: red)
+
+COLOR=${1:-RED}
+printf "\n\n"
+color-text $COLOR "$(divider)"
+printf "\n\n"

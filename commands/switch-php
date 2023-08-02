@@ -1,0 +1,93 @@
+#!/bin/bash
+
+# Script to install another PHP version and remove the current one including all packages
+echo "$(divider)"
+
+# Check if we run as root
+if [ "$EUID" -ne 0 ]; then
+    print-error "Please run as root"
+    divider
+    exit 1
+fi
+
+# $1: PHP version to install
+VERSION_TO_INSTALL=$1
+# Check if PHP version is provided
+if [ -z "$VERSION_TO_INSTALL" ]; then
+    print-error "No PHP version provided"
+    divider
+    exit 1
+fi
+
+# Check if PHP version is valid 
+if ! [[ "$VERSION_TO_INSTALL" =~ ^[0-9]+\.[0-9]+$ ]]; then
+    print-error "Invalid PHP version ($VERSION_TO_INSTALL) provided, must be of format <major>.<minor>"
+    divider
+    exit 1
+fi
+
+# Get the current PHP version
+CURRENT_PHP_VERSION=$(php -v | head -n 1 | cut -d " " -f 2 | cut -d "." -f 1,2)
+
+# Check if PHP version is installed
+if [ "$CURRENT_PHP_VERSION" ==  $VERSION_TO_INSTALL ]; then
+    print-error "PHP $VERSION_TO_INSTALL is the current version."
+    divider
+    exit 1
+fi
+
+# Get the installed modules
+INSTALLED_MODULES=$(dpkg -l | grep php | grep -v php-common | grep -v php$CURRENT_PHP_VERSION | grep -v php$VERSION_TO_INSTALL | awk '{print $2}')
+echo $INSTALLED_MODULES > /tmp/installed-modules.txt
+
+# Check if we can find new PHP version in repository
+if ! apt-cache show php$VERSION_TO_INSTALL > /dev/null 2>&1; then
+    # If not, we need to add a repository
+    print-output "Adding repository for PHP $VERSION_TO_INSTALL"; INDENT=$?
+    add-apt-repository -y ppa:ondrej/php > /dev/null 2>&1
+    print-return $INDENT $?
+    apt-up
+fi
+
+# Check if adding this repo has solved the problem
+if ! apt-cache show php$VERSION_TO_INSTALL > /dev/null 2>&1; then
+    print-output "Could not find PHP $VERSION_TO_INSTALL in repository"; INDENT=$?
+    # Remove repository again
+    add-apt-repository -r -y ppa:ondrej/php > /dev/null 2>&1
+    print-return $INDENT $?
+    apt-up
+    divider
+    exit 1
+fi
+
+# Remove all PHP packages
+print-output "Removing PHP $CURRENT_PHP_VERSION"; INDENT=$?
+apt-get purge -y php$CURRENT_PHP_VERSION > /dev/null 2>&1
+print-return $INDENT $?
+
+print-output "Removing PHP modules"; INDENT=$?
+apt-get purge -y $INSTALLED_MODULES > /dev/null 2>&1
+print-return $INDENT $?
+
+# Remove all dependencies that are no longer needed
+apt-get autoremove -y > /dev/null 2>&1
+
+# Install all modules again
+install-php-modules $VERSION_TO_INSTALL "${INSTALLED_MODULES[@]}"
+
+# Get the installed modules
+INSTALLED_MODULES=$(dpkg -l | grep php | grep -v php-common | grep -v php$CURRENT_PHP_VERSION | grep -v php$VERSION_TO_INSTALL | awk '{print $2}')
+echo $INSTALLED_MODULES > /tmp/installed-modules-new.txt
+
+# Check difference between the two files, to see if everything is installed
+DIFFERENCE=$(diff /tmp/installed-modules.txt /tmp/installed-modules-new.txt)
+
+if [ -z "$DIFFERENCE" ]; then
+    print-output "All modules installed successfully"
+else
+    print-error "Not all modules installed successfully"
+    print-output "Difference:"
+    echo $DIFFERENCE
+fi
+
+divider

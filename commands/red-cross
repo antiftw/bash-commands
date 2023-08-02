@@ -1,0 +1,3 @@
+#!/bin/bash
+# Prints a red cross
+color-text ✘ RED

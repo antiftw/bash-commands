@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Execute a MySQL command
+
+# $1: command to execute
+
+# Split command to print first two parts
+COMMAND=$(echo "$1" | cut -d' ' -f1-2)
+
+# Print command
+print-output "$COMMAND"; INDENT=$?
+
+# Execute command
+mysql -e "$1" ; RETURN_STATUS=$?
+
+# Print output corresponding to return status of a command
+print-return $RETURN_STATUS $INDENT

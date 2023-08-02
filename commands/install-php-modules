@@ -1,0 +1,45 @@
+#!/bin/bash
+
+# Gets a version number and a list of modules and installs them
+
+# $1: PHP version to install
+# $2: List of modules to install
+VERSION_TO_INSTALL=$1
+MODULES_TO_INSTALL=$2
+
+# Check if PHP version is provided
+if [ -z "$VERSION_TO_INSTALL" ]; then
+    print-error "No PHP version provided"
+    exit 1
+fi
+
+# Check if PHP version is valid
+if ! [[ "$VERSION_TO_INSTALL" =~ ^[0-9]+\.[0-9]+$ ]]; then
+    print-error "Invalid PHP version provided"
+    exit 1
+fi
+
+## Remove some stuff from array before inserting version numbers
+# Remove pkg-php-tools from array, since that does not need a version number
+MODULES_TO_INSTALL=$(echo $MODULES_TO_INSTALL | sed "s/pkg-php-tools//g")
+# Remove libapache2-mod-php from array, since that is a special case
+MODULES_TO_INSTALL=$(echo $MODULES_TO_INSTALL | sed "s/libapache2-mod-php//g")
+# Remove the PHP package itself from array, since that is a special case
+MODULES_TO_INSTALL=$(echo $MODULES_TO_INSTALL | sed "s/php//")
+
+## Add the version number to the modules
+# Since we get a module as php-<module>, we need to insert the version number in between
+MODULES_TO_INSTALL=$(echo $MODULES_TO_INSTALL | sed "s/php-/php${VERSION_TO_INSTALL}-/g")
+
+## Add version numbers to the removed modules, and add them to the list again
+# PHP itself
+MODULES_TO_INSTALL=$(echo $MODULES_TO_INSTALL | sed "s/^/php${VERSION_TO_INSTALL} /g")
+# libapache2-mod-php
+MODULES_TO_INSTALL=$(echo $MODULES_TO_INSTALL | sed "s/^/libapache2-mod-php${VERSION_TO_INSTALL} /g")
+# pkg-php-tools (does not need a version number)
+MODULES_TO_INSTALL=$(echo $MODULES_TO_INSTALL | sed "s/^/pkg-php-tools /g")
+
+# Loop through the modules and install them
+for MODULE in $MODULES_TO_INSTALL; do
+    apt-gi "$MODULE"
+done

@@ -1,0 +1,3 @@
+#!/bin/bash
+# Print divider for the full width of the terminal
+printf '%.s─' $(seq 1 $(tput cols))
