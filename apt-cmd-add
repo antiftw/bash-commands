@@ -49,9 +49,6 @@ for arg in "$@"; do
         -i=*|--install-path=*)
             INSTALL_PATH="${arg#*=}"
             ;;
-        -l=*|--logfile=*)
-            CUSTOM_LOGFILE="${arg#*=}"
-            ;;
         -v|--verbose)
             VERBOSE=1
             ;;

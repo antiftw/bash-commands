@@ -40,7 +40,7 @@ for arg in "$@"; do
             echo "                               - Filename - read from current path ($PWD)"
             echo "                               - Path + filename - read from given path"
             echo ""
-            echo "  -o, --output=<output_file>  Key output filename, can be:"
+            echo "  -o, --output=<output_file>  Key output (file)name, can be:"
             echo "                               - Empty (default) - filename will be generated from name keyfile"                             
             echo "                               - Filename - advised when keyfile in url has generic name"                        
             echo ""
@@ -49,12 +49,13 @@ for arg in "$@"; do
             echo "                               - default: /usr/share/keyrings"
             echo "                               - for package maintainers use: /etc/apt/keyrings"
             echo ""
-            echo " The following options are used to add the corresponding repository to sources.list"
-            echo " They will be passed on to apt-src-add, see apt-src-add --help for more information"
             echo " If -sc, -ss and -su are not set, no repository will not be added, and you will have to do it manually"
             echo "  -s,  --source-signature=<string>   Signature of the repository to add, can be:"
             echo "                                      - blank (default) - signature will be passed on from script"
             echo "                                      - full path       - specified signature will be used to sign repository"
+            echo ""
+            echo " The following options are used to add the corresponding repository to sources.list"
+            echo " They will be passed on to apt-src-add, see apt-src-add --help for more information"
             echo ""
             echo "  -sc, --source-components=<string>  Components of the repository to add"
             echo "  -ss, --source-suites=<string>      Suites of the repository to add"
@@ -83,7 +84,7 @@ for arg in "$@"; do
         -su=*|--source-uri=*)
             SOURCE_URI="${arg#*=}"
             ;;
-        -s=*|--source-signatory=*)
+        -s=*|--source-signature=*)
             SOURCE_SIGNATURE="${arg#*=}"
             ;;
         -p=*|--path=*)
@@ -199,13 +200,16 @@ SOURCE_SUITES=${SOURCE_SUITES:-}
 SOURCE_URI=${SOURCE_URI:-}
 SOURCE_SIGNATURE=${SOURCE_SIGNATURE:-}
 
+# Set the name for the sources file
+NAME="$KEYFILE"
+
 # Keyring path not set -> use default
 KEYPATH=${KEYRING:-"/usr/share/keyrings"}
 # Append -archive-keyring.gpg following recommended naming convention
 KEYFILE="$KEYFILE-archive-keyring.gpg"
 [ "$VERBOSE" -ge 1 ] && printf "✔️"
 if [ "$VERBOSE" -ge 2 ]; then 
-    printf "Variables:\n"
+    printf "\nVariables:\n"
     printf "Input keyfile     : %s\n" "$KEY"
     printf "Intermediate file : %s/%s \n" "$TMPPATH" "$TMPFILE"
     printf "Outputfile        : %s/%s \n" "$KEYPATH" "$KEYFILE"
@@ -219,22 +223,20 @@ if [ "$VERBOSE" -ge 2 ]; then
 fi
 
 
-if [ ! -z "$SOURCE_URI" ] || [ ! -z "$SOURCE_SUITES" ] || [ ! -z "$SOURCE_COMPONENTS" ] || [ ! -z "$SOURCE_SIGNATURE" ]; then
+if [ ! -z "$SOURCE_URI" ] || [ ! -z "$SOURCE_SUITES" ] || [ ! -z "$SOURCE_COMPONENTS" ]; then
     # If we are going to add a source: check if apt-src-add is installed
     if [ ! "$(command -v apt-src-add)" ]; then
         exit_error "apt-src-add command is not recognized"
     fi
-    # If one of them is set, SOURCE_URI, SOURCE_SIGNATURE and SOURCE_SUITES must be set
+    # If one of them is set, SOURCE_URI, and SOURCE_SUITES must be set
     if [ -z "$SOURCE_URI" ]; then
         exit_error "SOURCE_URI must be set when adding a source"
-    elif [ -z "$SOURCE_SIGNATURE" ]; then
-        exit_error "SOURCE_SIGNATURE must be set when adding a source"
     elif [ -z "$SOURCE_SUITES" ]; then
         exit_error "SOURCE_SUITES must be set when adding a source"
     fi
 
     # The reuired value of SOURCE_COMPONENTS depends on the value of SOURCE_SUITES
-    case "$SUITES" in
+    case "$SOURCE_SUITES" in
         # Check if it is an exact path (ending with /)
         */)
             # Meaning COMPONENTS must be empty
@@ -246,7 +248,7 @@ if [ ! -z "$SOURCE_URI" ] || [ ! -z "$SOURCE_SUITES" ] || [ ! -z "$SOURCE_COMPON
         # Otherwise, it should be a distribution name
         *)
             # Meaning SUITES cannot contain slashes
-            if [[ "$SUITES" =~ '/' ]]; then
+            if [[ "$SOURCE_SUITES" =~ '/' ]]; then
                 exit_error "When SUITES is a Distribution name, slashes are not allowed, see --help for more information"
             fi
             
@@ -337,7 +339,7 @@ else
 fi
 
 # If source information is set, add it to the sources.list.d
-if [ ! -z "$SOURCE_URI" ] && [ ! -z "$SOURCE_SUITES" ] && [ ! -z "$SOURCE_COMPONENTS" ]; then
+if [ ! -z "$SOURCE_URI" ] && [ ! -z "$SOURCE_SUITES" ]; then
     [ "$VERBOSE" -ge 1 ] && printf "\nAdding repository to sources"
     # Pass on verbose level
     VERBOSE_STRING=""
@@ -349,7 +351,10 @@ if [ ! -z "$SOURCE_URI" ] && [ ! -z "$SOURCE_SUITES" ] && [ ! -z "$SOURCE_COMPON
     [ "$SOURCE_SIGNATURE" != "" ] && KEYRING_STRING="$SOURCE_SIGNATURE"
 
     # Create source file
-    apt-src-add -n=$NAME -u=$SOURCE_URI -s=$SOURCE_SUITES -c=$SOURCE_COMPONENTS -os=$KEYRING_STRING $VERBOSE_STRING ; RETURN_CODE=$?
+    if [ ! -z "$SOURCE_COMPONENTS" ]; 
+    then apt-src-add -n=$NAME -u=$SOURCE_URI -s=$SOURCE_SUITES -c=$SOURCE_COMPONENTS -os=$KEYRING_STRING $VERBOSE_STRING ; RETURN_CODE=$?
+    else apt-src-add -n=$NAME -u=$SOURCE_URI -s=$SOURCE_SUITES -os=$KEYRING_STRING $VERBOSE_STRING ; RETURN_CODE=$?
+    fi
     if [ "$RETURN_CODE" -ne 0 ]; then
         exit_error "Failed to add source to sources.list.d"
     else

@@ -264,7 +264,7 @@ VALID_UNTIL_MAX=${VALID_UNTIL_MAX:-""}
 case "$SUITES" in
     # Check if it is an exact path (i.e. end with a slash)
     */)
-        if [ -z "$COMPONENTS" ]; then
+        if [ ! -z "$COMPONENTS" ]; then
             exit_error "COMPONENTS must NOT be set when SUITES is an exact path"
         fi
         ;;
@@ -288,6 +288,7 @@ declare -a REQUIRED_ARGS_MISSING=();
 [ -z "$TYPES" ] && REQUIRED_ARGS_MISSING+=("TYPES")
 [ -z "$URIS" ] && REQUIRED_ARGS_MISSING+=("URIS")
 [ -z "$SIGNATURE" ] && REQUIRED_ARGS_MISSING+=("SIGNATURE")
+[ -z "$NAME" ] && REQUIRED_ARGS_MISSING+=("NAME")
 
 if [ ${#REQUIRED_ARGS_MISSING[@]} -gt 0 ]; then
     exit_error "Missing required arguments: ${REQUIRED_ARGS_MISSING[*]}, use --help for more information"
@@ -493,8 +494,6 @@ if [ "$FORMAT" == "DEB822" ]; then
         [ "$VERBOSE" -gt 0 ] && printf "Source file will be created at %s\n" "$FILE"
         mv "$TMP_FILE" "$FILE"
     fi
-    # Remove temporary file
-    rm "$TMP_FILE"
 
 elif [ "$FORMAT" == "OLS" ]; then
     # One Line Format
