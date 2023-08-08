@@ -1,12 +1,27 @@
 #!/bin/bash
 # Run apt update and upgrade at the same time
 
-print-output "Updating and upgrading apt packages"; INDENT=$?
 
-# If the user is not root, run the commands with sudo
+exit_error() {
+    # print errpr message 
+    printf "\n\033[0;31mERROR:\033[0m $1\n\n" >&2
+    exit 1
+}
+
 if [[ $EUID -ne 0 ]]; then
-    sudo apt update && sudo apt upgrade -y 
-else
-    apt update && apt upgrade -y
+    exit_error "This script must be run as root"
 fi
 
+divider
+print-output "Updating and upgrading apt packages"; INDENT=$?
+apt-get -qq update >> /dev/null 2>&1; RETURN_STATUS_1=$? 
+apt-get -y upgrade >> /dev/null 2>&1 ; RETURN_STATUS_2=$? 
+
+print-return $INDENT $RETURN_STATUS_1 + $RETURN_STATUS_2
+
+if [ -x "$(command -v snap)" ]; then
+    print-output "Updating snap packages"; INDENT=$?
+    snap refresh >> /dev/null 2>&1
+    print-return $INDENT $?
+fi
+divider
