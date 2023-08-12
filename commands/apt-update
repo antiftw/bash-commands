@@ -17,7 +17,7 @@ print-output "Updating and upgrading apt packages"; INDENT=$?
 apt-get -qq update >> /dev/null 2>&1; RETURN_STATUS_1=$? 
 apt-get -y upgrade >> /dev/null 2>&1 ; RETURN_STATUS_2=$? 
 
-print-return $INDENT $RETURN_STATUS_1 + $RETURN_STATUS_2
+print-return $INDENT "$(($RETURN_STATUS_1 + $RETURN_STATUS_2))"
 
 if [ -x "$(command -v snap)" ]; then
     print-output "Updating snap packages"; INDENT=$?
