@@ -12,16 +12,43 @@ if [[ $EUID -ne 0 ]]; then
     exit_error "This script must be run as root"
 fi
 
+OUTPUT_APT=$PWD/output_apt.txt
+OUTPUT_SNAP=$PWD/output_snap.txt
+
 divider
 print-output "Updating and upgrading apt packages"; INDENT=$?
-apt-get -qq update >> /dev/null 2>&1; RETURN_STATUS_1=$? 
-apt-get -y upgrade >> /dev/null 2>&1 ; RETURN_STATUS_2=$? 
+apt-get -qq update >> $OUTPUT_APT 2>&1; RETURN_STATUS_APT_1=$?
+apt-get -y upgrade >> $OUTPUT_APT 2>&1 ; RETURN_STATUS_APT_2=$?
 
-print-return $INDENT "$(($RETURN_STATUS_1 + $RETURN_STATUS_2))"
+APT_RETURN=$((RETURN_STATUS_APT_1 + RETURN_STATUS_APT_2))
+
+print-return $INDENT "$APT_RETURN"
 
 if [ -x "$(command -v snap)" ]; then
     print-output "Updating snap packages"; INDENT=$?
-    snap refresh >> /dev/null 2>&1
-    print-return $INDENT $?
+    snap refresh >> $OUTPUT_SNAP 2>&1; RETURN_STATUS_SNAP=$?
+    print-return $INDENT $RETURN_STATUS_SNAP
 fi
+
+if [ $APT_RETURN -ne 0 ]; then
+    if [ $RETURN_STATUS_APT_1 -ne 0 ]; then
+        print-output "Error updating apt packages"; INDENT=$?
+        print-return $INDENT $RETURN_STATUS_APT_1
+    fi
+    if [ $RETURN_STATUS_APT_2 -ne 0 ]; then
+        print-output "Error upgrading apt packages"; INDENT=$?
+        print-return $INDENT $RETURN_STATUS_APT_2
+    fi
+    cat $OUTPUT_APT;
+fi
+
+if [ $RETURN_STATUS_SNAP -ne 0 ]; then
+    print-output "Error updating snap packages"; INDENT=$?
+    print-return $INDENT $RETURN_STATUS_SNAP
+    cat $OUTPUT_SNAP;
+fi
+
+rm $OUTPUT_SNAP
+rm $OUTPUT_APT
+
 divider

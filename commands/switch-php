@@ -1,7 +1,21 @@
 #!/bin/bash
 
 # Script to install another PHP version and remove the current one including all packages
-echo "$(divider)"
+divider
+
+# $1: PHP version to install
+VERSION_TO_INSTALL=$1
+
+if [ "$VERSION_TO_INSTALL" == '-h' ] || [ "$VERSION_TO_INSTALL" == '--help' ]; then
+    print-output "switch-php" true
+    divider
+    print-output "This script can be used to switch PHP versions" true
+    print-output "Usage: switch-php <version>" true
+    print-output "Example: switch-php 7.4" true
+    divider
+    exit 0
+fi
+
 
 # Check if we run as root
 if [ "$EUID" -ne 0 ]; then
@@ -10,8 +24,7 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-# $1: PHP version to install
-VERSION_TO_INSTALL=$1
+
 # Check if PHP version is provided
 if [ -z "$VERSION_TO_INSTALL" ]; then
     print-error "No PHP version provided"
@@ -62,15 +75,17 @@ fi
 
 # Remove all PHP packages
 print-output "Removing PHP $CURRENT_PHP_VERSION"; INDENT=$?
-apt-get purge -y php$CURRENT_PHP_VERSION > /dev/null 2>&1
+apt-get purge -y php$CURRENT_PHP_VERSION  >> /dev/null 2>&1;
 print-return $INDENT $?
 
 print-output "Removing PHP modules"; INDENT=$?
-apt-get purge -y $INSTALLED_MODULES > /dev/null 2>&1
+apt-get purge -y $INSTALLED_MODULES  >> /dev/null 2>&1;
 print-return $INDENT $?
 
 # Remove all dependencies that are no longer needed
-apt-get autoremove -y > /dev/null 2>&1
+print-output "Removing dependencies"; INDENT=$?
+apt-get autoremove -y  >> /dev/null 2>&1;
+print-return $INDENT $?
 
 # Install all modules again
 install-php-modules $VERSION_TO_INSTALL "${INSTALLED_MODULES[@]}"
@@ -78,6 +93,11 @@ install-php-modules $VERSION_TO_INSTALL "${INSTALLED_MODULES[@]}"
 # Get the installed modules
 INSTALLED_MODULES=$(dpkg -l | grep php | grep -v php-common | grep -v php$CURRENT_PHP_VERSION | grep -v php$VERSION_TO_INSTALL | awk '{print $2}')
 echo $INSTALLED_MODULES > /tmp/installed-modules-new.txt
+
+print-output "Switching PHP version"; INDENT=$?
+update-alternatives --set php /usr/bin/php$VERSION_TO_INSTALL >> /dev/null 2>&1
+print-return $INDENT $?
+
 
 # Check difference between the two files, to see if everything is installed
 DIFFERENCE=$(diff /tmp/installed-modules.txt /tmp/installed-modules-new.txt)

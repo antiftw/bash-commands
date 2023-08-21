@@ -26,6 +26,9 @@ MODULES_TO_INSTALL=$(echo $MODULES_TO_INSTALL | sed "s/pkg-php-tools//g")
 MODULES_TO_INSTALL=$(echo $MODULES_TO_INSTALL | sed "s/libapache2-mod-php//g")
 # Remove the PHP package itself from array, since that is a special case
 MODULES_TO_INSTALL=$(echo $MODULES_TO_INSTALL | sed "s/php//")
+# Remove php-pear from array, since that is a special case and does not need a version number
+MODULES_TO_INSTALL=$(echo $MODULES_TO_INSTALL | sed "s/php-pear//")
+
 
 ## Add the version number to the modules
 # Since we get a module as php-<module>, we need to insert the version number in between
@@ -38,6 +41,8 @@ MODULES_TO_INSTALL=$(echo $MODULES_TO_INSTALL | sed "s/^/php${VERSION_TO_INSTALL
 MODULES_TO_INSTALL=$(echo $MODULES_TO_INSTALL | sed "s/^/libapache2-mod-php${VERSION_TO_INSTALL} /g")
 # pkg-php-tools (does not need a version number)
 MODULES_TO_INSTALL=$(echo $MODULES_TO_INSTALL | sed "s/^/pkg-php-tools /g")
+# php-pear
+MODULES_TO_INSTALL=$(echo $MODULES_TO_INSTALL | sed "s/^/php-pear /g")
 
 # Loop through the modules and install them
 for MODULE in $MODULES_TO_INSTALL; do
