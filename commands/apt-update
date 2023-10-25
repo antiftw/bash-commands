@@ -14,6 +14,7 @@ fi
 
 OUTPUT_APT=$PWD/output_apt.txt
 OUTPUT_SNAP=$PWD/output_snap.txt
+OUTPUT_FLATPAK=$PWD/output_flatpak.txt
 
 divider
 print-output "Updating and upgrading apt packages"; INDENT=$?
@@ -28,6 +29,12 @@ if [ -x "$(command -v snap)" ]; then
     print-output "Updating snap packages"; INDENT=$?
     snap refresh >> $OUTPUT_SNAP 2>&1; RETURN_STATUS_SNAP=$?
     print-return $INDENT $RETURN_STATUS_SNAP
+fi
+
+if [ -x "$(command -v flatpak)" ]; then
+    print-output "Updating flatpak packages"; INDENT=$?
+    flatpak update >> $OUTPUT_FLATPAK 2>&1; RETURN_STATUS_FLATPAK=$?
+    print-return $INDENT $RETURN_STATUS_FLATPAK
 fi
 
 if [ $APT_RETURN -ne 0 ]; then
@@ -48,7 +55,14 @@ if [ $RETURN_STATUS_SNAP -ne 0 ]; then
     cat $OUTPUT_SNAP;
 fi
 
+if [ $RETURN_STATUS_FLATPAK -ne 0 ]; then
+    print-output "Error updating flatpak packages"; INDENT=$?
+    print-return $INDENT $RETURN_STATUS_FLATPAK
+    cat $OUTPUT_FLATPAK;
+fi
+
 rm $OUTPUT_SNAP
 rm $OUTPUT_APT
+rm $OUTPUT_FLATPAK
 
 divider
