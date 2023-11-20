@@ -33,7 +33,7 @@ fi
 
 if [ -x "$(command -v flatpak)" ]; then
     print-output "Updating flatpak packages"; INDENT=$?
-    flatpak update >> $OUTPUT_FLATPAK 2>&1; RETURN_STATUS_FLATPAK=$?
+    flatpak update -y --noninteractive  >> $OUTPUT_FLATPAK 2>&1; RETURN_STATUS_FLATPAK=$?
     print-return $INDENT $RETURN_STATUS_FLATPAK
 fi
 
