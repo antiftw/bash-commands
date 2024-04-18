@@ -1,0 +1,21 @@
+[user]
+	name = Antolin Janssen
+	email = admin@antiftw.nl
+[init]
+    defaultBranch = main
+[alias]
+	co = checkout
+	br = branch
+	ci = commit
+	st = status
+    di = diff
+    lg = log
+    pl = pull
+    ps = push
+    me = merge
+    rb = rebase
+    cl = clone
+    rs = reset
+    tg = tag
+    st = stash
+    sp = stash pop
