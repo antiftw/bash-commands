@@ -4,10 +4,10 @@
 [init]
     defaultBranch = main
 [alias]
-	co = checkout
-	br = branch
-	ci = commit
-	st = status
+    co = checkout
+    br = branch
+    ci = commit
+    st = status
     di = diff
     lg = log
     pl = pull
