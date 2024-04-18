@@ -216,7 +216,7 @@ done
 
 # Handle .gitconfig setup, check if the file exists already
 GITCONFIG_SRC="$SCRIPT_DIR/config/.gitconfig"
-GITCONFIG_DEST="$HOME/.gitconfig"
+GITCONFIG_DEST="/home/$SUDO_USER/.gitconfig"
 if [ ! -f "$HOME/.gitconfig" ]; then
     # If verbose log rule
     handle_copy "$GITCONFIG_SRC" "$GITCONFIG_DEST"
