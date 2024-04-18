@@ -223,7 +223,7 @@ if [ ! -f "$GITCONFIG_DEST" ]; then
 else
     # Check if force is true
     if [ "$FORCE" = true ]; then
-        handle_copy "$SCRIPT_DIR/config/.gitconfig" "$HOME/.gitconfig"
+        handle_copy "$SCRIPT_DIR/config/.gitconfig" "$GITCONFIG_DEST"
     else
         print_output ".gitconfig already exists, use -f to force overwrite"
         COMMANDS_SKIPPED+=("$GITCONFIG_COMMAND")
