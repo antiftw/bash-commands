@@ -7,7 +7,7 @@
     co = checkout
     br = branch
     ci = commit
-    ss = status
+    st = status
     di = diff
     lg = log
     pl = pull

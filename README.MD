@@ -91,7 +91,7 @@ The command is written to support all options from the RFC, however only the bas
 ### apt-add-src
 
 - Add validation for all the options, as well as thouroughly test them. Currently only verified that the basic usage works, since most options will usually be left to their default values and should not be used in most use-cases.
-
+- Automatically setup .bash_aliases.
 ## Resources
 
 - [About the different .sources.d/ formats](https://repolib.readthedocs.io/en/latest/deb822-format.html)
