@@ -19,7 +19,7 @@ OUTPUT_FLATPAK=$PWD/output_flatpak.txt
 divider
 print-output "Updating and upgrading apt packages"; INDENT=$?
 apt-get -qq update >> $OUTPUT_APT 2>&1; RETURN_STATUS_APT_1=$?
-apt-get -y upgrade >> $OUTPUT_APT 2>&1 ; RETURN_STATUS_APT_2=$?
+apt-get -y --allow-downgrades upgrade >> $OUTPUT_APT 2>&1 ; RETURN_STATUS_APT_2=$?
 
 APT_RETURN=$((RETURN_STATUS_APT_1 + RETURN_STATUS_APT_2))
 
