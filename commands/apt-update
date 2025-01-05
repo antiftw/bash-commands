@@ -35,6 +35,8 @@ if [ -x "$(command -v flatpak)" ]; then
     print-output "Updating flatpak packages"; INDENT=$?
     flatpak update -y --noninteractive  >> $OUTPUT_FLATPAK 2>&1; RETURN_STATUS_FLATPAK=$?
     print-return $INDENT $RETURN_STATUS_FLATPAK
+else 
+    print-output "Unable to locate Flatpak. Skipping..."
 fi
 
 if [ $APT_RETURN -ne 0 ]; then
