@@ -37,6 +37,7 @@ if [ -x "$(command -v flatpak)" ]; then
     print-return $INDENT $RETURN_STATUS_FLATPAK
 else 
     print-output "Unable to locate Flatpak. Skipping..."
+    RETURN_STATUS_FLATPAK=1;
 fi
 
 if [ $APT_RETURN -ne 0 ]; then
@@ -65,6 +66,19 @@ fi
 
 rm $OUTPUT_SNAP
 rm $OUTPUT_APT
-rm $OUTPUT_FLATPAK
+
+if test -f "$OUTPUT_SNAP"; then
+    rm $OUTPUT_SNAP
+fi
+
+if test -f "$OUTPUT_APT"; then
+    rm $OUTPUT_APT
+fi
+
+if test -f "$OUTPUT_FLATPAK"; then
+    rm $OUTPUT_FLATPAK
+fi
+
+
 
 divider
