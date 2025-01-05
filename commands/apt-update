@@ -18,7 +18,7 @@ OUTPUT_FLATPAK=$PWD/output_flatpak.txt
 
 divider
 print-output "Updating and upgrading apt packages"; INDENT=$?
-apt-get -qq update >> $OUTPUT_APT 2>&1; RETURN_STATUS_APT_1=$?
+apt-get -qq update > $OUTPUT_APT 2>&1; RETURN_STATUS_APT_1=$?
 apt-get -y --allow-downgrades upgrade >> $OUTPUT_APT 2>&1 ; RETURN_STATUS_APT_2=$?
 
 APT_RETURN=$((RETURN_STATUS_APT_1 + RETURN_STATUS_APT_2))
@@ -27,7 +27,7 @@ print-return $INDENT "$APT_RETURN"
 
 if [ -x "$(command -v snap)" ]; then
     print-output "Updating snap packages"; INDENT=$?
-    snap refresh >> $OUTPUT_SNAP 2>&1; RETURN_STATUS_SNAP=$?
+    snap refresh > $OUTPUT_SNAP 2>&1; RETURN_STATUS_SNAP=$?
     print-return $INDENT $RETURN_STATUS_SNAP
 fi
 
@@ -35,8 +35,11 @@ if [ -x "$(command -v flatpak)" ]; then
     print-output "Updating flatpak packages"; INDENT=$?
     flatpak update -y --noninteractive  >> $OUTPUT_FLATPAK 2>&1; RETURN_STATUS_FLATPAK=$?
     print-return $INDENT $RETURN_STATUS_FLATPAK
-else 
-    print-output "Unable to locate Flatpak. Skipping..."
+else
+    ERROR_MESSAGE="Unable to locate Flatpak.";
+    echo "$ERROR_MESSAGE" > $OUTPUT_FLATPAK
+    print-output "${ERROR_MESSAGE}  Skipping..." ; INDENT=$?
+    print-return $INDENT -1
     RETURN_STATUS_FLATPAK=1;
 fi
 
@@ -66,19 +69,6 @@ fi
 
 rm $OUTPUT_SNAP
 rm $OUTPUT_APT
-
-if test -f "$OUTPUT_SNAP"; then
-    rm $OUTPUT_SNAP
-fi
-
-if test -f "$OUTPUT_APT"; then
-    rm $OUTPUT_APT
-fi
-
-if test -f "$OUTPUT_FLATPAK"; then
-    rm $OUTPUT_FLATPAK
-fi
-
-
+rm $OUTPUT_FLATPAK
 
 divider
